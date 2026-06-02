@@ -1,0 +1,118 @@
+## ─────────────────────────────────────────────────────────────────────────
+## GitHub Actions — Automated Preprocessing Pipeline
+## Student : Timotius Kristafael Harjanto
+## Criterion 1 — Advanced
+##
+## Triggers:
+##   • push  (any branch)  when preprocessing/ or dataset_raw/ files change
+##   • workflow_dispatch   (manual run from GitHub UI)
+##
+## Pipeline steps:
+##   1. Checkout
+##   2. Set up Python 3.12.7
+##   3. Cache pip dependencies
+##   4. Install dependencies
+##   5. Run automate_TimotiusKristafaelHarjanto.py
+##   6. Verify output files exist
+##   7. Commit updated processed dataset back to repo
+## ─────────────────────────────────────────────────────────────────────────
+
+name: Automated Preprocessing Pipeline
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "preprocessing/**"
+      - "dataset_raw/**"
+      - ".github/workflows/preprocessing.yml"
+
+  workflow_dispatch:
+    inputs:
+      force_download:
+        description: "Re-download raw dataset (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  preprocessing:
+    name: "Run Preprocessing & Commit Dataset"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      # ── 2. Python setup ────────────────────────────────────────────────
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7"
+          cache: "pip"
+
+      # ── 3. Install dependencies ────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            pandas==2.2.3 \
+            numpy==1.26.4 \
+            scikit-learn==1.5.2 \
+            matplotlib==3.9.2 \
+            seaborn==0.13.2
+
+      # ── 4. (Optional) force-remove cached raw data ────────────────────
+      - name: Force re-download raw data
+        if: github.event.inputs.force_download == 'true'
+        run: |
+          rm -f dataset_raw/adult.csv
+          echo "Cleared cached raw dataset — will re-download."
+
+      # ── 5. Run preprocessing ───────────────────────────────────────────
+      - name: Run preprocessing pipeline
+        working-directory: preprocessing
+        run: |
+          python automate_TimotiusKristafaelHarjanto.py
+
+      # ── 6. Verify outputs ──────────────────────────────────────────────
+      - name: Verify processed dataset files
+        run: |
+          echo "=== Checking output files ==="
+          test -f preprocessing/dataset_preprocessed/train.csv \
+            && echo "✓ train.csv exists" \
+            || (echo "✗ train.csv MISSING" && exit 1)
+          test -f preprocessing/dataset_preprocessed/test.csv \
+            && echo "✓ test.csv exists" \
+            || (echo "✗ test.csv MISSING" && exit 1)
+          echo "=== File info ==="
+          wc -l preprocessing/dataset_preprocessed/train.csv
+          wc -l preprocessing/dataset_preprocessed/test.csv
+          head -n 2 preprocessing/dataset_preprocessed/train.csv
+
+      # ── 7. Commit updated dataset ──────────────────────────────────────
+      - name: Commit processed dataset
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add preprocessing/dataset_preprocessed/
+          git add dataset_raw/
+          if git diff --staged --quiet; then
+            echo "No changes to commit — dataset is up to date."
+          else
+            git commit -m "ci: auto-update preprocessed dataset [skip ci]"
+            git push
+            echo "Dataset committed and pushed."
+          fi
+
+      # ── 8. Upload as GitHub artifact (for download without checkout) ───
+      - name: Upload processed dataset as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: preprocessed-dataset-${{ github.run_number }}
+          path: preprocessing/dataset_preprocessed/
+          retention-days: 30

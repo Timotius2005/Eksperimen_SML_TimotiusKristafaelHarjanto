@@ -1,0 +1,3 @@
+# This directory stores the raw Adult Income dataset.
+# The file adult.csv is auto-downloaded by the preprocessing pipeline.
+# It is excluded from version control via .gitignore (large binary).

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+preprocessing.log
+
+# MLflow
+mlruns/
+
+# Large data files (committed separately or auto-downloaded)
+dataset_raw/adult.csv
+
+# OS
+.DS_Store
+Thumbs.db
